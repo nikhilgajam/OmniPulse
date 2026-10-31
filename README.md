@@ -61,6 +61,7 @@ Reddit and various APIs aggressively block cloud runners (like GitHub Actions IP
 🥇 *Gold 24K (10g):* ₹1,38,880(-3,380)
 🥇 *Gold 22K (10g):* ₹1,27,300(-3,100)
 🥇 *Gold 18K (10g):* ₹1,04,160(-2,530)
+
 🥈 *Silver (10g):* ₹2,000
 🥈 *Silver (1 Kg):* ₹2,00,000
 ```
@@ -69,7 +70,9 @@ Reddit and various APIs aggressively block cloud runners (like GitHub Actions IP
 📊 *Indian Market Snapshot*
 
 • *NIFTY 50:* 23,053.10 (+0.51%)
+
 • *SENSEX:* 74,459.53 (+0.42%)
+
 • *USD / INR:* ₹95.07
 ```
 
@@ -77,7 +80,9 @@ Reddit and various APIs aggressively block cloud runners (like GitHub Actions IP
 ₿ *Crypto Pulse*
 
 • 🟠 *Bitcoin (BTC):* ₹7,359,914 ($77,544.00) • 🟢 +0.03% [🔗](https://...)
+
 • 🔹 *Ethereum (ETH):* ₹213,531 ($2,249.76) • 🟢 +0.86% [🔗](https://...)
+
 • 🟣 *Solana (SOL):* ₹9,105 ($95.93) • 🟢 +0.94% [🔗](https://...)
 ```
 
@@ -86,10 +91,13 @@ Reddit and various APIs aggressively block cloud runners (like GitHub Actions IP
 
 1. *Backdoor in Claude Code for VS Code extension on Cursor Marketplace* [🔗](https://...)
    ↳ 941 pts • 537 comments
+
 2. *Serbia just elected the world's brainiest parliament* [🔗](https://...)
    ↳ 582 pts • 338 comments
+
 3. *The $6.3B Binance hack was pulled off in just 20 minutes* [🔗](https://...)
    ↳ 531 pts • 376 comments
+
 ... (Top 10 total)
 ```
 
@@ -98,8 +106,10 @@ Reddit and various APIs aggressively block cloud runners (like GitHub Actions IP
 
 1. *Nanbeige/Nanbeige4.3-33B* [🔗](https://huggingface.co/Nanbeige/Nanbeige4.3-33B)
    ↳ ❤️ 840 likes • Text Generation
+
 2. *deepseek-ai/DeepSeek-V4.1-Flash-1017* [🔗](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017)
    ↳ ❤️ 4,072 likes • Image Text To Text
+
 3. *LiquidAI/LFM3-1.7B* [🔗](https://huggingface.co/LiquidAI/LFM3-1.7B)
    ↳ ❤️ 606 likes • Text Generation
 ```

@@ -38,6 +38,7 @@ log = logging.getLogger("omnipulse")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
 CONFIG_PATH = os.getenv("CONFIG_PATH", "config.json")
 
@@ -381,19 +382,42 @@ def extract_huggingface(response: requests.Response, fields: dict) -> dict:
 
 
 def extract_github_trending(response: requests.Response, fields: dict) -> dict:
-    """Extract trending repositories from GitHub Search API (created in the last 7 days)."""
+    """
+    Extract trending repositories.
+    Supports both https://github.com/trending (HTML) and GitHub Search API (JSON).
+    """
     count = int(fields.get("count", 3))
     result = {}
-    try:
-        import datetime
-        days = int(fields.get("days", 7))
-        since = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y-%m-%d")
-        lang = fields.get("language", "")
-        lang_q = f"+language:{lang}" if lang else ""
-        url = f"https://api.github.com/search/repositories?q=created:>{since}{lang_q}&sort=stars&order=desc&per_page={count}"
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=15)
-        items = r.json().get("items", []) if r.status_code == 200 else response.json().get("items", [])
 
+    # 1. Try parsing HTML (from https://github.com/trending)
+    content_type = response.headers.get("Content-Type", "")
+    if "text/html" in content_type or response.text.strip().startswith("<!DOCTYPE") or "<html" in response.text[:200]:
+        try:
+            soup = BeautifulSoup(response.text, "html.parser")
+            articles = soup.find_all("article", class_="Box-row")
+            for i, a in enumerate(articles[:count], 1):
+                h2 = a.find("h2")
+                name = "".join(h2.get_text().split()) if h2 else "N/A"
+                p = a.find("p")
+                desc = p.get_text(strip=True) if p else "No description"
+                if len(desc) > 85:
+                    desc = desc[:82] + "..."
+                clean_desc = desc.replace("*", "").replace("[", "(").replace("]", ")")
+                star_link = a.find("a", href=lambda x: x and x.endswith("/stargazers"))
+                stars = star_link.get_text(strip=True) if star_link else "N/A"
+                result[f"item_{i}_name"] = name
+                result[f"item_{i}_stars"] = stars
+                result[f"item_{i}_desc"] = clean_desc
+                result[f"item_{i}_url"] = f"https://github.com/{name}"
+            result["total_items"] = str(len(articles[:count]))
+            if result.get("total_items") != "0":
+                return result
+        except Exception as exc:
+            log.warning("Could not parse HTML trending page: %s", exc)
+
+    # 2. Try parsing JSON (from GitHub Search API)
+    try:
+        items = response.json().get("items", [])
         for i, repo in enumerate(items[:count], 1):
             full_name = repo.get("full_name", "N/A")
             stars = repo.get("stargazers_count", 0)
@@ -406,8 +430,10 @@ def extract_github_trending(response: requests.Response, fields: dict) -> dict:
             result[f"item_{i}_desc"] = clean_desc
             result[f"item_{i}_url"] = repo.get("html_url") or f"https://github.com/{full_name}"
         result["total_items"] = str(len(items[:count]))
+        return result
     except Exception as exc:
         log.error("Failed to parse GitHub trending data: %s", exc)
+
     return result
 
 
@@ -521,36 +547,51 @@ NOTIFIERS = {
 # ─── Message formatters for special extractors ─────────────────────────────
 
 def format_rss_message(name: str, extracted: dict, template: str) -> str:
-    """Format RSS items into a readable message with link icons."""
+    """Format RSS items into a readable message with link icons and spaced items."""
     if template and "{" in template:
         try:
             return template.format(**extracted)
         except KeyError:
             pass
 
-    lines = [f"📰 *{name}*\n"]
+    items = []
     i = 1
     while f"item_{i}_title" in extracted:
         title = extracted[f"item_{i}_title"]
-        source = extracted.get(f"item_{i}_source", "")
-        link = extracted.get(f"item_{i}_link", "")
-        clean_title = title.replace("*", "").replace("[", "(").replace("]", ")")
+        source = extracted.get(f"item_{i}_source", "").strip()
+        link = extracted.get(f"item_{i}_link", "").strip()
+        clean_title = title.replace("*", "").replace("[", "(").replace("]", ")").strip()
+
+        # Remove duplicate source suffix from title (e.g. "... - The Hindu")
+        if source:
+            for sep in [" - ", " | ", " — "]:
+                suffix = f"{sep}{source}"
+                if clean_title.lower().endswith(suffix.lower()):
+                    clean_title = clean_title[:-len(suffix)].strip()
+                    break
+        if " - " in clean_title:
+            parts = clean_title.rsplit(" - ", 1)
+            if len(parts) == 2 and (not source or source.lower() in parts[1].lower() or parts[1].lower() in source.lower()):
+                clean_title = parts[0].strip()
+                if not source:
+                    source = parts[1].strip()
+
         source_str = f" _({source})_" if source else ""
         link_icon = f" [🔗]({link})" if link else ""
-        lines.append(f"{i}. {clean_title}{source_str}{link_icon}")
+        items.append(f"{i}. {clean_title}{source_str}{link_icon}")
         i += 1
-    return "\n".join(lines)
+    return f"📰 *{name}*\n\n" + "\n\n".join(items)
 
 
 def format_reddit_message(name: str, extracted: dict, template: str) -> str:
-    """Format Reddit posts into a readable message with link icons."""
+    """Format Reddit posts into a readable message with link icons and spaced items."""
     if template and "{" in template:
         try:
             return template.format(**extracted)
         except KeyError:
             pass
 
-    lines = [f"🔥 *{name}*\n"]
+    items = []
     i = 1
     while f"post_{i}_title" in extracted:
         title = extracted[f"post_{i}_title"]
@@ -562,9 +603,9 @@ def format_reddit_message(name: str, extracted: dict, template: str) -> str:
         score_str = f" • ⬆️ {score}" if score and score != "0" else ""
         link_icon = f" [🔗]({url})" if url else ""
         extra = f"\n   {sub_str}{score_str}" if (sub_str or score_str) else ""
-        lines.append(f"{i}. *{clean_title}*{link_icon}{extra}")
+        items.append(f"{i}. *{clean_title}*{link_icon}{extra}")
         i += 1
-    return "\n".join(lines)
+    return f"🔥 *{name}*\n\n" + "\n\n".join(items)
 
 
 def format_gold_silver_message(name: str, extracted: dict, template: str) -> str:
@@ -575,60 +616,67 @@ def format_gold_silver_message(name: str, extracted: dict, template: str) -> str
         except KeyError:
             pass
 
-    lines = [f"🪙 *{name}*\n"]
+    gold_lines = []
     if extracted.get("gold_24k_10g") and extracted["gold_24k_10g"] != "N/A":
-        lines.append(f"🥇 *Gold 24K (10g):* {extracted['gold_24k_10g']}")
+        gold_lines.append(f"🥇 *Gold 24K (10g):* {extracted['gold_24k_10g']}")
     elif extracted.get("gold_24k") and extracted["gold_24k"] != "N/A":
-        lines.append(f"🥇 *Gold 24K (10g):* {extracted['gold_24k']}")
+        gold_lines.append(f"🥇 *Gold 24K (10g):* {extracted['gold_24k']}")
 
     if extracted.get("gold_22k_10g") and extracted["gold_22k_10g"] != "N/A":
-        lines.append(f"🥇 *Gold 22K (10g):* {extracted['gold_22k_10g']}")
+        gold_lines.append(f"🥇 *Gold 22K (10g):* {extracted['gold_22k_10g']}")
     elif extracted.get("gold_22k") and extracted["gold_22k"] != "N/A":
-        lines.append(f"🥇 *Gold 22K (10g):* {extracted['gold_22k']}")
+        gold_lines.append(f"🥇 *Gold 22K (10g):* {extracted['gold_22k']}")
 
     if extracted.get("gold_18k_10g") and extracted["gold_18k_10g"] != "N/A":
-        lines.append(f"🥇 *Gold 18K (10g):* {extracted['gold_18k_10g']}")
+        gold_lines.append(f"🥇 *Gold 18K (10g):* {extracted['gold_18k_10g']}")
 
+    silver_lines = []
     if extracted.get("silver_10g") and extracted["silver_10g"] != "N/A":
-        lines.append(f"🥈 *Silver (10g):* {extracted['silver_10g']}")
+        silver_lines.append(f"🥈 *Silver (10g):* {extracted['silver_10g']}")
     if extracted.get("silver_1kg") and extracted["silver_1kg"] != "N/A":
-        lines.append(f"🥈 *Silver (1 Kg):* {extracted['silver_1kg']}")
+        silver_lines.append(f"🥈 *Silver (1 Kg):* {extracted['silver_1kg']}")
     elif extracted.get("silver") and extracted["silver"] != "N/A":
-        lines.append(f"🥈 *Silver:* {extracted['silver']}")
+        silver_lines.append(f"🥈 *Silver:* {extracted['silver']}")
 
-    return "\n".join(lines)
+    sections = []
+    if gold_lines:
+        sections.append("\n".join(gold_lines))
+    if silver_lines:
+        sections.append("\n".join(silver_lines))
+
+    return f"🪙 *{name}*\n\n" + "\n\n".join(sections)
 
 
 def format_markets_message(name: str, extracted: dict, template: str) -> str:
-    """Format market snapshot into a readable message."""
+    """Format market snapshot into a readable message with clean line breaks."""
     if template and "{" in template:
         try:
             return template.format(**extracted)
         except KeyError:
             pass
 
-    lines = [f"📊 *{name}*\n"]
+    items = []
     if extracted.get("nifty_50_price") and extracted["nifty_50_price"] != "N/A":
         chg = f" ({extracted.get('nifty_50_change')})" if extracted.get("nifty_50_change") else ""
-        lines.append(f"• *NIFTY 50:* {extracted['nifty_50_price']}{chg}")
+        items.append(f"• *NIFTY 50:* {extracted['nifty_50_price']}{chg}")
     if extracted.get("sensex_price") and extracted["sensex_price"] != "N/A":
         chg = f" ({extracted.get('sensex_change')})" if extracted.get("sensex_change") else ""
-        lines.append(f"• *SENSEX:* {extracted['sensex_price']}{chg}")
+        items.append(f"• *SENSEX:* {extracted['sensex_price']}{chg}")
     if extracted.get("usd_inr") and extracted["usd_inr"] != "N/A":
-        lines.append(f"• *USD / INR:* {extracted['usd_inr']}")
+        items.append(f"• *USD / INR:* {extracted['usd_inr']}")
 
-    return "\n".join(lines)
+    return f"📊 *{name}*\n\n" + "\n\n".join(items)
 
 
 def format_hackernews_message(name: str, extracted: dict, template: str) -> str:
-    """Format Hacker News stories into a readable message with link icons."""
+    """Format Hacker News stories into a readable message with blank lines between items."""
     if template and "{" in template:
         try:
             return template.format(**extracted)
         except KeyError:
             pass
 
-    lines = [f"⚡ *{name}*\n"]
+    items = []
     i = 1
     while f"item_{i}_title" in extracted:
         title = extracted[f"item_{i}_title"]
@@ -638,14 +686,14 @@ def format_hackernews_message(name: str, extracted: dict, template: str) -> str:
 
         clean_title = title.replace("*", "").replace("[", "(").replace("]", ")")
         link_icon = f" [🔗]({url})" if url else ""
-        lines.append(f"{i}. *{clean_title}*{link_icon}\n   ↳ {points} pts • {comments} comments")
+        items.append(f"{i}. *{clean_title}*{link_icon}\n   ↳ {points} pts • {comments} comments")
         i += 1
-    return "\n".join(lines)
+    return f"⚡ *{name}*\n\n" + "\n\n".join(items)
 
 
 def format_huggingface_message(name: str, extracted: dict, template: str) -> str:
-    """Format trending Hugging Face AI models into a readable message."""
-    lines = [f"🤖 *{name}*\n"]
+    """Format trending Hugging Face AI models with blank lines between items."""
+    items = []
     i = 1
     while f"item_{i}_id" in extracted:
         model_id = extracted[f"item_{i}_id"]
@@ -653,14 +701,14 @@ def format_huggingface_message(name: str, extracted: dict, template: str) -> str
         pipeline = extracted.get(f"item_{i}_pipeline", "")
         url = extracted.get(f"item_{i}_url", "")
         link_icon = f" [🔗]({url})" if url else ""
-        lines.append(f"{i}. *{model_id}*{link_icon}\n   ↳ ❤️ {likes} likes • {pipeline}")
+        items.append(f"{i}. *{model_id}*{link_icon}\n   ↳ ❤️ {likes} likes • {pipeline}")
         i += 1
-    return "\n".join(lines)
+    return f"🤖 *{name}*\n\n" + "\n\n".join(items)
 
 
 def format_github_trending_message(name: str, extracted: dict, template: str) -> str:
-    """Format trending GitHub repositories into a readable message."""
-    lines = [f"⭐ *{name}*\n"]
+    """Format trending GitHub repositories with blank lines between items."""
+    items = []
     i = 1
     while f"item_{i}_name" in extracted:
         name_str = extracted[f"item_{i}_name"]
@@ -668,19 +716,19 @@ def format_github_trending_message(name: str, extracted: dict, template: str) ->
         desc = extracted.get(f"item_{i}_desc", "")
         url = extracted.get(f"item_{i}_url", "")
         link_icon = f" [🔗]({url})" if url else ""
-        lines.append(f"{i}. *{name_str}*{link_icon}\n   ↳ 🌟 {stars} stars • {desc}")
+        items.append(f"{i}. *{name_str}*{link_icon}\n   ↳ 🌟 {stars} stars • {desc}")
         i += 1
-    return "\n".join(lines)
+    return f"⭐ *{name}*\n\n" + "\n\n".join(items)
 
 
 def format_crypto_message(name: str, extracted: dict, template: str) -> str:
-    """Format crypto prices into a readable message with distinctive crypto icons."""
-    lines = [f"₿ *{name}*\n"]
+    """Format crypto prices into a readable message with clean line breaks."""
     coin_icons = {
         "bitcoin": "🟠",
         "ethereum": "🔹",
         "solana": "🟣",
     }
+    items = []
     for coin_id in ["bitcoin", "ethereum", "solana"]:
         if f"{coin_id}_price" in extracted and extracted[f"{coin_id}_price"] != "N/A":
             label = extracted[f"{coin_id}_label"]
@@ -689,8 +737,8 @@ def format_crypto_message(name: str, extracted: dict, template: str) -> str:
             url = extracted.get(f"{coin_id}_url", "")
             icon = coin_icons.get(coin_id, "•")
             link_icon = f" [🔗]({url})" if url else ""
-            lines.append(f"• {icon} *{label}:* {price} • {chg}{link_icon}")
-    return "\n".join(lines)
+            items.append(f"• {icon} *{label}:* {price} • {chg}{link_icon}")
+    return f"₿ *{name}*\n\n" + "\n\n".join(items)
 
 
 def format_nasa_apod_message(name: str, extracted: dict, template: str) -> str:
@@ -733,15 +781,36 @@ def run_job(job: dict) -> None:
     if "User-Agent" not in headers:
         headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
+    # Auto-inject GitHub token if available and querying GitHub API
+    if "api.github.com" in job["url"] and GITHUB_TOKEN and "Authorization" not in headers:
+        headers["Authorization"] = f"token {GITHUB_TOKEN}"
+
     try:
         resp = requests.request(method, job["url"], headers=headers, timeout=60)
         resp.raise_for_status()
     except requests.RequestException as exc:
-        error_msg = f"❌ *Job Failed: {name}*\n\nCould not fetch URL:\n`{exc}`"
-        for channel in job.get("notify", []):
-            NOTIFIERS.get(channel, lambda _: None)(error_msg)
-        log.error("Fetch failed for %s: %s", name, exc)
-        return
+        # If GitHub API fails (e.g. rate limit exceeded), fall back to public trending page
+        if job.get("extract", {}).get("type") == "github_trending":
+            log.warning("GitHub API throttled (%s). Falling back to https://github.com/trending ...", exc)
+            try:
+                resp = requests.get(
+                    "https://github.com/trending",
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+                    timeout=20,
+                )
+                resp.raise_for_status()
+            except Exception as fb_exc:
+                error_msg = f"❌ *Job Failed: {name}*\n\nCould not fetch URL:\n`{fb_exc}`"
+                for channel in job.get("notify", []):
+                    NOTIFIERS.get(channel, lambda _: None)(error_msg)
+                log.error("Fetch fallback failed for %s: %s", name, fb_exc)
+                return
+        else:
+            error_msg = f"❌ *Job Failed: {name}*\n\nCould not fetch URL:\n`{exc}`"
+            for channel in job.get("notify", []):
+                NOTIFIERS.get(channel, lambda _: None)(error_msg)
+            log.error("Fetch failed for %s: %s", name, exc)
+            return
 
     # 2. Extract data
     extract_cfg = job["extract"]
