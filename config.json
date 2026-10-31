@@ -1,0 +1,159 @@
+{
+  "jobs": [
+    {
+      "name": "Gold & Silver Prices - Hyderabad",
+      "url": "https://www.goodreturns.in/gold-rates/hyderabad.html",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "gold_silver",
+        "fields": {
+          "silver_url": "https://www.goodreturns.in/silver-rates/hyderabad.html"
+        }
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "Indian Market Snapshot",
+      "url": "https://open.er-api.com/v6/latest/USD",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "markets",
+        "fields": {}
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "Crypto Pulse",
+      "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=inr,usd&include_24hr_change=true",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "crypto",
+        "fields": {}
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "Top India News",
+      "url": "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "rss",
+        "fields": {
+          "count": "3"
+        }
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "Hyderabad City News",
+      "url": "https://news.google.com/rss/search?q=Hyderabad&hl=en-IN&gl=IN&ceid=IN:en",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "rss",
+        "fields": {
+          "count": "3"
+        }
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "Reddit Popular Topics",
+      "url": "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.reddit.com%2Fr%2Fpopular.rss",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "reddit",
+        "fields": {
+          "count": "3"
+        }
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "Tech & AI Pulse",
+      "url": "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=10",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "hackernews",
+        "fields": {
+          "count": "10"
+        }
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "Hugging Face Trending AI",
+      "url": "https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit=3",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "huggingface",
+        "fields": {
+          "count": "3"
+        }
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "GitHub Trending Repos",
+      "url": "https://api.github.com/search/repositories?q=stars:>100&sort=stars&order=desc&per_page=3",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "github_trending",
+        "fields": {
+          "count": "3",
+          "days": "7"
+        }
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    },
+    {
+      "name": "NASA Astronomy Picture",
+      "url": "https://apod.com/feed.rss",
+      "method": "GET",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      },
+      "extract": {
+        "type": "nasa_apod",
+        "fields": {}
+      },
+      "message_template": "",
+      "notify": ["telegram"]
+    }
+  ]
+}
