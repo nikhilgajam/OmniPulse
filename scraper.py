@@ -891,10 +891,10 @@ def main() -> None:
 
     # Send closing divider to all notified channels
     divider_message = (
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━\n"
         "🏁 *OmniPulse • 6-Hour Update Complete*\n"
         "⏰ _Next briefing in 6 hours_\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        "━━━━━━━━━━━━━━━━━━━━━━━"
     )
 
     print("\n" + "=" * 60)
