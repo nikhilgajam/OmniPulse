@@ -889,6 +889,25 @@ def main() -> None:
 
     log.info("All jobs completed ✓")
 
+    # Send closing divider to all notified channels
+    divider_message = (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🏁 *OmniPulse • 6-Hour Update Complete*\n"
+        "⏰ _Next briefing in 6 hours_\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    print("\n" + "=" * 60)
+    print("🏁 [ALL PUSHES COMPLETED] OmniPulse 6-Hour Cycle Finished")
+    print("=" * 60 + "\n")
+
+    # Send closing divider to each unique configured channel
+    all_channels = {ch for job in jobs for ch in job.get("notify", [])}
+    for channel in all_channels:
+        notifier = NOTIFIERS.get(channel)
+        if notifier:
+            notifier(divider_message)
+
 
 if __name__ == "__main__":
     main()
