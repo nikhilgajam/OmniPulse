@@ -1,7 +1,7 @@
 # 🔔 OmniPulse
 
 > Automated 6-hour intelligence pulse running via GitHub Actions.  
-> Delivers **10 curated feeds** — precious metals, financial markets, crypto, local & national news, viral discussions, trending AI models, open-source repos, and cosmic wonders — directly to your **Telegram**.
+> Delivers **11 curated feeds** — precious metals, financial markets, crypto, local & national news, viral discussions, trending AI models, open-source repos, space news, and cosmic wonders — directly to your **Telegram**.
 
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Scheduled-2088FF?logo=github-actions&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -9,12 +9,12 @@
 
 ---
 
-## 📦 What You Get Every 6 Hours (10 Curated Feeds)
+## 📦 What You Get Every 6 Hours (11 Curated Feeds)
 
 | # | Feed | Category | What's Extracted |
 |:---:|---|---|---|
-| 1 | 🪙 **Gold & Silver (Hyderabad)** | Commodities | 24K, 22K, 18K gold per **10 grams** + Silver (10g & 1 Kg) |
-| 2 | 📊 **Indian Market Snapshot** | Finance | **NIFTY 50**, **SENSEX** (with % change) & **USD / INR** rate |
+| 1 | 🪙 **Precious Metals (Hyderabad)** | Commodities | **Gold** (24K, 22K, 18K per 10g), **Silver** (10g & 1 Kg) & **Platinum** (1g & 10g) |
+| 2 | 📊 **Indian Market Snapshot** | Finance | **NIFTY 50**, **SENSEX** (with % change), **USD / INR** rate & ⛽ **Petrol** (₹ / L) |
 | 3 | ₿ **Crypto Pulse** | Crypto Assets | **Bitcoin (BTC)**, **Ethereum (ETH)**, **Solana (SOL)** in ₹ and $ + 24h % change + `[🔗]` links |
 | 4 | 📰 **Top India News** | National News | Top 3 verified headlines + news sources + `[🔗]` links |
 | 5 | 🏙️ **Hyderabad City News** | Local News | Top 3 local Hyderabad/Telangana developments + `[🔗]` links |
@@ -22,7 +22,8 @@
 | 7 | ⚡ **Tech & AI Pulse** | Tech News | **Top 10** Hacker News stories + points + comments + `[🔗]` links |
 | 8 | 🤖 **Hugging Face Trending AI** | AI & Machine Learning | Top 3 breakout AI models + likes + pipeline task + `[🔗]` links |
 | 9 | ⭐ **GitHub Trending Repos** | Open Source | Top 3 breakout repositories created this week + stars + `[🔗]` links |
-| 10 | 🌌 **NASA Picture of the Day** | Astronomy | Daily deep-space photography title + explanation + `[🔗]` link |
+| 10 | 🚀 **Space News** | Space & Astronomy | 3 fresh space articles from NASA, SpaceX, ESA & more — updated every run + `[🔗]` links |
+| 11 | 🌌 **NASA Astronomy Picture** | Astronomy | Daily deep-space photography title + explanation + `[🔗]` link |
 
 ---
 
@@ -50,6 +51,11 @@ In line with Indian retail standards, all gold prices (24K, 22K, 18K) for Hydera
 
 ### 4. Zero Cloud Blocking (Reliable Scrapers)
 Reddit and various APIs aggressively block cloud runners (like GitHub Actions IPs) with HTTP 403 / 429 errors. This project routes through public syndication endpoints and RSS bridges, ensuring **100% uptime and no IP blocks** during scheduled runs.
+
+### 5. Two Space Feeds — Fresh News + Daily Wonder
+OmniPulse delivers space content in two complementary ways:
+- 🚀 **Space News** — pulls 3 fresh articles every 6 hours from the [Spaceflight News API](https://spaceflightnewsapi.net/), covering NASA, SpaceX, ESA, and more. Content changes with every run.
+- 🌌 **NASA Astronomy Picture** — NASA's iconic daily deep-space image. This updates **once per day at midnight UTC** (06:30 AM IST), so all 4 daily runs will show the same picture until the next day.
 
 ---
 
@@ -119,6 +125,19 @@ Reddit and various APIs aggressively block cloud runners (like GitHub Actions IP
 
 🔭 *Haunting the Cepheus Flare* [🔗](https://science.nasa.gov/...)
 _Spooky shapes seem to haunt this dusty expanse, drifting through the night in the royal constellation Cepheus_
+```
+
+```text
+🚀 *Space News*
+
+1. *SpaceX Completes Three Static Fires in Three Days for Flight 15* [🔗](https://...) _(NASASpaceflight)_
+   _In eight days, SpaceX completed all engine testing for Flight 15, some cryo-proof and catch tests..._
+
+2. *Live coverage: SpaceX to close out October with Halloween eve Falcon 9 launch* [🔗](https://...) _(Spaceflight Now)_
+   _The Starlink 15-18 mission will add another 27 Starlink V2 Mini Optimized satellites to SpaceX's..._
+
+3. *ISRO's PSLV-C59 successfully deploys ESA's Proba-3 satellites* [🔗](https://...) _(NASA)_
+   _Two spacecraft will fly in precise formation to study the Sun's corona like never before..._
 ```
 
 ---
@@ -235,11 +254,12 @@ All jobs are configured in [`config.json`](config.json). You can adjust any job 
 | `gold_silver` | Hyderabad 10g Gold & Silver rates | `silver_url` |
 | `markets` | Nifty 50, Sensex & USD/INR | Automatically tracked |
 | `rss` | Google News India & Hyderabad News | `count` (number of headlines) |
-| `reddit` | Reddit Popular discussions | `count` (number of posts) |
+| `reddit` | Reddit Popular discussions (via direct RSS feed) | `count` (number of posts) |
 | `hackernews` | Top Hacker News tech & AI stories | `count` (default: 10) |
 | `huggingface` | Trending AI Models & Weights | `count` (default: 3) |
 | `github_trending`| Breakout repositories created this week | `count` (default: 3), `days` |
 | `crypto` | Live crypto prices (BTC/ETH/SOL) | Automatically tracked |
+| `spaceflight_news` | Fresh space news from Spaceflight News API | `count` (default: 3) |
 | `nasa_apod` | NASA Astronomy Picture of the Day | Automatically tracked |
 | `json` | Generic REST APIs | JSONPath field mapping |
 | `css` | Generic HTML web scraping | CSS selectors |

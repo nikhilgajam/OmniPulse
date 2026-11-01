@@ -132,68 +132,103 @@ def extract_reddit(response: requests.Response, fields: dict) -> dict:
     """
     Extract popular posts from Reddit.
     Supports:
-    1. rss2json API output (format: {"items": [{"title": ..., "categories": ...}]})
-    2. Direct Reddit JSON API (format: {"data": {"children": [...]}})
-    3. Direct Reddit Atom/RSS XML
+    1. Direct Reddit JSON API (format: {"data": {"children": [...]}})
+    2. Direct Reddit Atom/RSS XML fallback
+    3. rss2json API output (legacy, format: {"items": [...]})
+
+    Falls back to fetching Reddit RSS directly if the primary response is an error.
     """
     count = int(fields.get("count", 3))
-    result = {}
 
-    # Try parsing as JSON first
-    try:
-        data = response.json()
+    def _parse(resp):
+        """Try all known Reddit response formats. Returns result dict or None."""
+        # Format 1: JSON-based responses
+        try:
+            data = resp.json()
 
-        # Format 1: rss2json
-        if "items" in data and isinstance(data["items"], list):
-            for i, item in enumerate(data["items"][:count], 1):
-                result[f"post_{i}_title"] = item.get("title", "N/A")
-                cats = item.get("categories", [])
-                sub = f"r/{cats[0]}" if cats else item.get("author", "")
-                result[f"post_{i}_subreddit"] = sub
-                result[f"post_{i}_score"] = ""
-                result[f"post_{i}_url"] = item.get("link", "")
-            result["total_posts"] = str(len(data["items"][:count]))
-            return result
+            # Detect rss2json error response and skip it
+            if data.get("status") == "error":
+                log.warning("rss2json returned an error: %s", data.get("message", "unknown"))
+                return None
 
-        # Format 2: Direct Reddit JSON
-        posts = data.get("data", {}).get("children", [])
-        if posts:
-            for i, post in enumerate(posts[:count], 1):
-                p = post.get("data", {})
-                result[f"post_{i}_title"] = p.get("title", "N/A")
-                result[f"post_{i}_subreddit"] = p.get("subreddit_name_prefixed", "N/A")
-                result[f"post_{i}_score"] = str(p.get("score", 0))
-                result[f"post_{i}_url"] = f"https://reddit.com{p.get('permalink', '')}"
-            result["total_posts"] = str(len(posts[:count]))
-            return result
+            # Direct Reddit JSON {"data": {"children": [...]}}
+            posts = data.get("data", {}).get("children", [])
+            if posts:
+                r = {}
+                for i, post in enumerate(posts[:count], 1):
+                    p = post.get("data", {})
+                    r[f"post_{i}_title"] = p.get("title", "N/A")
+                    r[f"post_{i}_subreddit"] = p.get("subreddit_name_prefixed", "N/A")
+                    r[f"post_{i}_score"] = str(p.get("score", 0))
+                    r[f"post_{i}_url"] = f"https://reddit.com{p.get('permalink', '')}"
+                r["total_posts"] = str(len(posts[:count]))
+                return r
 
-    except Exception:
-        pass
+            # rss2json format {"items": [...]}
+            if "items" in data and isinstance(data["items"], list) and data["items"]:
+                r = {}
+                for i, item in enumerate(data["items"][:count], 1):
+                    r[f"post_{i}_title"] = item.get("title", "N/A")
+                    cats = item.get("categories", [])
+                    sub = f"r/{cats[0]}" if cats else item.get("author", "")
+                    r[f"post_{i}_subreddit"] = sub
+                    r[f"post_{i}_score"] = ""
+                    r[f"post_{i}_url"] = item.get("link", "")
+                r["total_posts"] = str(len(data["items"][:count]))
+                return r
 
-    # Format 3: Atom/XML parsing fallback
-    try:
-        root = ET.fromstring(response.content)
-        entries = root.findall(".//{http://www.w3.org/2005/Atom}entry") or root.findall(".//entry")
-        for i, entry in enumerate(entries[:count], 1):
-            title_el = entry.find("{http://www.w3.org/2005/Atom}title") or entry.find("title")
-            cat_el = entry.find("{http://www.w3.org/2005/Atom}category") or entry.find("category")
-            link_el = entry.find("{http://www.w3.org/2005/Atom}link") or entry.find("link")
+        except Exception:
+            pass
 
-            title = title_el.text.strip() if title_el is not None and title_el.text else "N/A"
-            sub = cat_el.attrib.get("label", cat_el.attrib.get("term", "r/popular")) if cat_el is not None else "r/popular"
-            link = link_el.attrib.get("href", "") if link_el is not None else ""
+        # Format 2: Atom/RSS XML
+        try:
+            root = ET.fromstring(resp.content)
+            entries = root.findall(".//{http://www.w3.org/2005/Atom}entry") or root.findall(".//entry")
+            if entries:
+                r = {}
+                for i, entry in enumerate(entries[:count], 1):
+                    title_el = entry.find("{http://www.w3.org/2005/Atom}title") or entry.find("title")
+                    cat_el = entry.find("{http://www.w3.org/2005/Atom}category") or entry.find("category")
+                    link_el = entry.find("{http://www.w3.org/2005/Atom}link") or entry.find("link")
+                    title = title_el.text.strip() if title_el is not None and title_el.text else "N/A"
+                    sub = cat_el.attrib.get("label", cat_el.attrib.get("term", "r/popular")) if cat_el is not None else "r/popular"
+                    link = link_el.attrib.get("href", "") if link_el is not None else ""
+                    r[f"post_{i}_title"] = title
+                    r[f"post_{i}_subreddit"] = sub
+                    r[f"post_{i}_score"] = ""
+                    r[f"post_{i}_url"] = link
+                r["total_posts"] = str(len(entries[:count]))
+                return r
+        except Exception:
+            pass
 
-            result[f"post_{i}_title"] = title
-            result[f"post_{i}_subreddit"] = sub
-            result[f"post_{i}_score"] = ""
-            result[f"post_{i}_url"] = link
-        result["total_posts"] = str(len(entries[:count]))
-        return result
-    except Exception as exc:
-        log.error("Could not parse Reddit data: %s", exc)
+        return None
 
+    # Try primary response first
+    parsed = _parse(response)
+    if parsed:
+        return parsed
+
+    # Primary failed (blocked/rate-limited/500) — try fallback URLs directly
+    log.warning("Primary Reddit fetch failed or empty. Trying fallback endpoints...")
+    reddit_headers = {"User-Agent": "OmniPulse/1.0 (automated feed reader; github actions)"}
+    fallback_urls = [
+        "https://www.reddit.com/r/popular/.rss",        # Atom feed — most reliable
+        "https://www.reddit.com/r/popular.json?limit=5", # JSON API — may be rate-limited
+    ]
+    for fb_url in fallback_urls:
+        try:
+            fb_resp = requests.get(fb_url, headers=reddit_headers, timeout=20)
+            if fb_resp.status_code == 200:
+                parsed = _parse(fb_resp)
+                if parsed:
+                    log.info("Reddit fallback succeeded via %s", fb_url)
+                    return parsed
+        except Exception as fb_exc:
+            log.warning("Reddit fallback %s failed: %s", fb_url, fb_exc)
+
+    log.error("All Reddit fetch attempts failed.")
     return {"error": "Failed to parse Reddit posts"}
-
 
 def extract_gold_silver(response: requests.Response, fields: dict) -> dict:
     """
@@ -260,11 +295,35 @@ def extract_gold_silver(response: requests.Response, fields: dict) -> dict:
     except Exception as exc:
         log.warning("Could not fetch silver rate: %s", exc)
 
+    # 3. Fetch Hyderabad Platinum Rate
+    try:
+        platinum_url = fields.get("platinum_url", "https://www.goodreturns.in/platinum-rate-in-hyderabad.html")
+        p_resp = requests.get(
+            platinum_url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+            timeout=20,
+        )
+        if p_resp.status_code == 200:
+            p_soup = BeautifulSoup(p_resp.text, "html.parser")
+            for table in p_soup.find_all("table"):
+                for row in table.find_all("tr"):
+                    cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
+                    if len(cells) >= 2 and cells[0] == "1":
+                        result["platinum_1g"] = cells[1]
+                    elif len(cells) >= 2 and cells[0] == "10":
+                        result["platinum_10g"] = cells[1]
+                if "platinum_10g" in result:
+                    break
+    except Exception as exc:
+        log.warning("Could not fetch platinum rate: %s", exc)
+
     result.setdefault("gold_24k_10g", "N/A")
     result.setdefault("gold_22k_10g", "N/A")
     result.setdefault("gold_18k_10g", "N/A")
     result.setdefault("silver_10g", "N/A")
     result.setdefault("silver_1kg", "N/A")
+    result.setdefault("platinum_1g", "N/A")
+    result.setdefault("platinum_10g", "N/A")
 
     return result
 
@@ -288,6 +347,8 @@ def extract_gold_silver_api(response: requests.Response, fields: dict) -> dict:
                 result[key] = str(price)
             elif "silver" in name:
                 result["silver_price"] = str(price)
+            elif "platinum" in name:
+                result["platinum_price"] = str(price)
     elif isinstance(data, dict):
         for key, val in data.items():
             key_lower = key.lower()
@@ -295,9 +356,12 @@ def extract_gold_silver_api(response: requests.Response, fields: dict) -> dict:
                 result["gold_price"] = str(val) if not isinstance(val, dict) else str(val.get("price", val))
             if "silver" in key_lower or key_lower in ("xag",):
                 result["silver_price"] = str(val) if not isinstance(val, dict) else str(val.get("price", val))
+            if "platinum" in key_lower or key_lower in ("xpt",):
+                result["platinum_price"] = str(val) if not isinstance(val, dict) else str(val.get("price", val))
 
     result.setdefault("gold_price", "N/A")
     result.setdefault("silver_price", "N/A")
+    result.setdefault("platinum_price", "N/A")
     return result
 
 
@@ -339,11 +403,32 @@ def extract_markets(response: requests.Response, fields: dict) -> dict:
         except Exception as exc:
             log.warning("Could not fetch %s: %s", label, exc)
 
+    # 3. Petrol Price (Hyderabad)
+    try:
+        petrol_url = fields.get("petrol_url", "https://www.goodreturns.in/petrol-price-in-hyderabad.html")
+        r_petrol = requests.get(petrol_url, headers=headers, timeout=15)
+        if r_petrol.status_code == 200:
+            p_soup = BeautifulSoup(r_petrol.text, "html.parser")
+            table = p_soup.find("table")
+            if table:
+                rows = table.find_all("tr")
+                if len(rows) > 1:
+                    cells = [c.get_text(strip=True) for c in rows[1].find_all(["td", "th"])]
+                    if len(cells) >= 2 and cells[1]:
+                        result["petrol_price"] = cells[1]
+                        if len(cells) >= 3 and cells[2] and cells[2] not in ("0.00", "0"):
+                            sign = "+" if not cells[2].startswith(("-", "+")) else ""
+                            result["petrol_change"] = f"{sign}{cells[2]}"
+    except Exception as exc:
+        log.warning("Could not fetch petrol price: %s", exc)
+
     result.setdefault("usd_inr", "N/A")
     result.setdefault("nifty_50_price", "N/A")
     result.setdefault("nifty_50_change", "")
     result.setdefault("sensex_price", "N/A")
     result.setdefault("sensex_change", "")
+    result.setdefault("petrol_price", "N/A")
+    result.setdefault("petrol_change", "")
     return result
 
 
@@ -492,6 +577,34 @@ def extract_nasa_apod(response: requests.Response, fields: dict) -> dict:
     return result
 
 
+
+def extract_spaceflight_news(response: requests.Response, fields: dict) -> dict:
+    """Extract latest space news from the Spaceflight News API (spaceflightnewsapi.net).
+    Returns fresh articles updated throughout the day — unlike APOD which is once per day.
+    """
+    count = int(fields.get("count", 3))
+    result = {}
+    try:
+        data = response.json()
+        articles = data.get("results", [])
+        for i, article in enumerate(articles[:count], 1):
+            title = article.get("title", "N/A")
+            clean_title = title.replace("*", "").replace("[", "(").replace("]", ")")
+            summary = article.get("summary", "")
+            # Trim summary to a readable length
+            if len(summary) > 160:
+                summary = summary[:157] + "..."
+            clean_summary = summary.replace("*", "").replace("[", "(").replace("]", ")")
+            result[f"item_{i}_title"] = clean_title
+            result[f"item_{i}_url"] = article.get("url", "")
+            result[f"item_{i}_site"] = article.get("news_site", "")
+            result[f"item_{i}_summary"] = clean_summary
+        result["total_items"] = str(len(articles[:count]))
+    except Exception as exc:
+        log.error("Failed to parse Spaceflight News API data: %s", exc)
+    return result
+
+
 EXTRACTORS = {
     "json": extract_json,
     "css": extract_css,
@@ -506,6 +619,7 @@ EXTRACTORS = {
     "github_trending": extract_github_trending,
     "crypto": extract_crypto,
     "nasa_apod": extract_nasa_apod,
+    "spaceflight_news": extract_spaceflight_news,
 }
 
 
@@ -645,11 +759,21 @@ def format_gold_silver_message(name: str, extracted: dict, template: str) -> str
     elif extracted.get("silver") and extracted["silver"] != "N/A":
         silver_lines.append(f"🥈 *Silver:* {extracted['silver']}")
 
+    platinum_lines = []
+    if extracted.get("platinum_1g") and extracted["platinum_1g"] != "N/A":
+        platinum_lines.append(f"⚪ *Platinum (1g):* {extracted['platinum_1g']}")
+    if extracted.get("platinum_10g") and extracted["platinum_10g"] != "N/A":
+        platinum_lines.append(f"⚪ *Platinum (10g):* {extracted['platinum_10g']}")
+    elif extracted.get("platinum_price") and extracted["platinum_price"] != "N/A":
+        platinum_lines.append(f"⚪ *Platinum:* {extracted['platinum_price']}")
+
     sections = []
     if gold_lines:
         sections.append("\n".join(gold_lines))
     if silver_lines:
         sections.append("\n".join(silver_lines))
+    if platinum_lines:
+        sections.append("\n".join(platinum_lines))
 
     return f"🪙 *{name}*\n\n" + "\n\n".join(sections)
 
@@ -671,6 +795,9 @@ def format_markets_message(name: str, extracted: dict, template: str) -> str:
         items.append(f"• *SENSEX:* {extracted['sensex_price']}{chg}")
     if extracted.get("usd_inr") and extracted["usd_inr"] != "N/A":
         items.append(f"• *USD / INR:* {extracted['usd_inr']}")
+    if extracted.get("petrol_price") and extracted["petrol_price"] != "N/A":
+        chg = f" ({extracted.get('petrol_change')})" if extracted.get("petrol_change") else ""
+        items.append(f"• ⛽ *Petrol (Hyd / L):* {extracted['petrol_price']}{chg}")
 
     return f"📊 *{name}*\n\n" + "\n\n".join(items)
 
@@ -761,6 +888,31 @@ def format_nasa_apod_message(name: str, extracted: dict, template: str) -> str:
     return "\n".join(lines)
 
 
+
+def format_spaceflight_news_message(name: str, extracted: dict, template: str) -> str:
+    """Format Spaceflight News API articles into a readable Telegram message."""
+    if template and "{" in template:
+        try:
+            return template.format(**extracted)
+        except KeyError:
+            pass
+
+    items = []
+    i = 1
+    while f"item_{i}_title" in extracted:
+        title = extracted[f"item_{i}_title"]
+        site = extracted.get(f"item_{i}_site", "")
+        url = extracted.get(f"item_{i}_url", "")
+        summary = extracted.get(f"item_{i}_summary", "")
+
+        link_icon = f" [\U0001f517]({url})" if url else ""
+        site_str = f" _({site})_" if site else ""
+        summary_str = ("\n   _" + summary + "_") if summary else ""
+        items.append(f"{i}. *{title}*{link_icon}{site_str}{summary_str}")
+        i += 1
+    return "\U0001f680 *" + name + "*\n\n" + "\n\n".join(items)
+
+
 SPECIAL_FORMATTERS = {
     "rss": format_rss_message,
     "reddit": format_reddit_message,
@@ -772,6 +924,7 @@ SPECIAL_FORMATTERS = {
     "github_trending": format_github_trending_message,
     "crypto": format_crypto_message,
     "nasa_apod": format_nasa_apod_message,
+    "spaceflight_news": format_spaceflight_news_message,
 }
 
 
