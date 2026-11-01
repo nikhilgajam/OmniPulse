@@ -1,15 +1,15 @@
 # 🔔 OmniPulse
 
-> Automated 6-hour intelligence pulse running via GitHub Actions.  
+> Automated market intelligence pulse running via GitHub Actions at market open and close.  
 > Delivers **11 curated feeds** — precious metals, financial markets, crypto, local & national news, viral discussions, trending AI models, open-source repos, space news, and cosmic wonders — directly to your **Telegram**.
 
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Scheduled-2088FF?logo=github-actions&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot%20API-26A5E4?logo=telegram&logoColor=white)
 
 ---
 
-## 📦 What You Get Every 6 Hours (11 Curated Feeds)
+## 📦 What You Get Each Run (11 Curated Feeds)
 
 | # | Feed | Category | What's Extracted |
 |:---:|---|---|---|
@@ -269,18 +269,21 @@ All jobs are configured in [`config.json`](config.json). You can adjust any job 
 
 ## 🕐 Execution Schedule
 
-The workflow runs on a cron schedule in [`.github/workflows/monitor.yml`](.github/workflows/monitor.yml):
+The workflow runs daily on a cron schedule aligned with Indian market open and close times in [`.github/workflows/monitor.yml`](.github/workflows/monitor.yml):
 
 ```yaml
 schedule:
-  - cron: "0 */6 * * *"   # Runs at 00:00, 06:00, 12:00, 18:00 UTC
+  # 09:15 AM IST (03:45 AM UTC) - Daily Morning Run
+  - cron: "45 3 * * *"
+  # 03:30 PM IST (10:00 AM UTC) - Daily Afternoon Run
+  - cron: "0 10 * * *"
 ```
 
 In Indian Standard Time (IST, UTC+5:30), this corresponds to:
-* **05:30 AM IST** (Morning Briefing)
-* **11:30 AM IST** (Midday Market Update)
-* **05:30 PM IST** (Evening Wrap-up)
-* **11:30 PM IST** (Night Tech & Trends Digest)
+* **09:15 AM IST** (Morning Market Open Pulse)
+* **03:30 PM IST** (Afternoon Market Close Wrap-up)
+
+*(Runs every day including weekends)*
 
 ---
 

@@ -1052,13 +1052,13 @@ def main() -> None:
     # Send closing divider to all notified channels
     divider_message = (
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🏁 *OmniPulse • 6-Hour Update Complete*\n"
-        "⏰ _Next briefing in 6 hours_\n"
+        "🏁 *OmniPulse • Market Briefing Complete*\n"
+        "⏰ _Next pulse at market open / close (IST)_\n"
         "━━━━━━━━━━━━━━━━━━━━━━━"
     )
 
     print("\n" + "=" * 60)
-    print("🏁 [ALL PUSHES COMPLETED] OmniPulse 6-Hour Cycle Finished")
+    print("🏁 [ALL PUSHES COMPLETED] OmniPulse Market Cycle Finished")
     print("=" * 60 + "\n")
 
     # Send closing divider to each unique configured channel
