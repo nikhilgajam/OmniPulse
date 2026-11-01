@@ -137,21 +137,57 @@ _Spooky shapes seem to haunt this dusty expanse, drifting through the night in t
    ```
 6. ✅ Save this as your `TELEGRAM_BOT_TOKEN`.
 
-### Step 2 — Get Your Chat ID
+---
 
-#### For Personal Chat:
-1. Search for **[@userinfobot](https://t.me/userinfobot)** on Telegram.
-2. Send `/start`.
-3. Note your numerical **Id** (e.g., `123456789`).
-4. ✅ Save this as your `TELEGRAM_CHAT_ID`.
+### Step 2 — Set Up Your Telegram Channel (Recommended)
 
-#### For a Group or Channel:
-1. Add your new bot as an Admin to your group/channel.
-2. Send a test message in the group.
-3. Open `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` in your browser.
-4. Locate `"chat":{"id": -100XXXXXXXXXX}` — copy that negative ID.
+A **Telegram Channel** is the best delivery method for OmniPulse — it works like a one-way broadcast newsletter. Anyone who joins your channel automatically receives every update, with no ID management needed.
 
-> ⚠️ **Important:** You must click **Start** (`/start`) in a private chat with your bot before it can message you!
+#### 2a — Create the Channel
+1. Open Telegram → tap the **pencil / compose** icon → **New Channel**.
+2. Give it a name and optional description (e.g., `OmniPulse Daily Feed`).
+3. Choose **Public** (gives it a shareable `@username`) or **Private**.
+4. ✅ Your channel is ready.
+
+#### 2b — Add Your Bot as Admin
+1. Open the channel → tap the channel name at the top → **Administrators** → **Add Administrator**.
+2. Search for your bot's username and select it.
+3. Enable the **"Post Messages"** permission.
+4. Tap **Save**.
+
+#### 2c — Get the Channel ID
+
+**Option 1 — Public channel** (easiest): Use the `@username` directly as the chat ID.
+```
+@YourChannelName
+```
+
+**Option 2 — Numeric ID** (works for both public & private, and never changes even if you rename the channel):
+1. Send any message in the channel.
+2. Open this URL in your browser (replace with your actual token):
+   ```
+   https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+   ```
+3. Find your channel in the response and copy the `id` value — it will be a **negative number**:
+   ```json
+   "chat": {
+     "id": -1001234567890,
+     "title": "OmniPulse Daily Feed",
+     "type": "channel"
+   }
+   ```
+
+> **Tip:** If `getUpdates` returns an empty result, forward any message from your channel to **[@userinfobot](https://t.me/userinfobot)** on Telegram — it will instantly reply with the channel's numeric ID.
+
+> **Note:** The numeric ID is the more robust choice — if you ever rename your channel's `@username`, the numeric ID stays the same forever.
+
+#### Alternative — Personal Chat or Group
+If you prefer to receive messages privately or in a group instead of a channel:
+
+- **Personal chat**: Search for **[@userinfobot](https://t.me/userinfobot)** → send `/start` → note your numeric **Id** (e.g., `123456789`). Then send `/start` to your own bot to activate it.
+- **Group**: Add the bot as admin, send a message in the group, then use `getUpdates` to find the group's negative chat ID.
+
+---
 
 ### Step 3 — Push to GitHub
 
@@ -168,17 +204,23 @@ In your GitHub repository:
 1. Navigate to **Settings** → **Secrets and variables** → **Actions**.
 2. Click **New repository secret** and add:
 
-| Secret Name | Value |
-|---|---|
-| `TELEGRAM_BOT_TOKEN` | Token received from @BotFather |
-| `TELEGRAM_CHAT_ID` | Your personal or group chat ID |
+| Secret Name | Value | Example |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Token from @BotFather | `7123456789:AAH1bG...` |
+| `TELEGRAM_CHAT_ID` | Channel `@username` or numeric ID | `@mychannel` or `-1001234567890` |
+
+> **Multiple recipients?** If you want to send to several individual chats, set `TELEGRAM_CHAT_IDS` (note the **S**) as a comma-separated list of chat IDs instead:
+> ```
+> 123456789,987654321,111222333
+> ```
+> The bot will send to each ID individually. `TELEGRAM_CHAT_ID` (single) is used as a fallback if `TELEGRAM_CHAT_IDS` is not set.
 
 ### Step 5 — Test & Run
 
 1. Go to the **Actions** tab in your repository.
 2. Select **OmniPulse** from the workflow list.
 3. Click **Run workflow** → **Run workflow**.
-4. Check your Telegram chat in ~30 seconds!
+4. Check your Telegram channel in ~30 seconds!
 
 ---
 
@@ -229,12 +271,12 @@ Run locally on your machine at any time:
 ```bash
 # On Linux / macOS
 export TELEGRAM_BOT_TOKEN="your_bot_token"
-export TELEGRAM_CHAT_ID="your_chat_id"
+export TELEGRAM_CHAT_ID="@yourchannel"   # or the numeric ID
 python scraper.py
 
 # On Windows (PowerShell)
 $env:TELEGRAM_BOT_TOKEN = "your_bot_token"
-$env:TELEGRAM_CHAT_ID = "your_chat_id"
+$env:TELEGRAM_CHAT_ID = "@yourchannel"   # or the numeric ID
 python scraper.py
 ```
 

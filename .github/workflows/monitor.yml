@@ -28,6 +28,9 @@ jobs:
       - name: Run OmniPulse
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          # TELEGRAM_CHAT_IDS: comma-separated subscriber chat IDs (e.g. "111,222,333")
+          # Falls back to TELEGRAM_CHAT_ID for single-subscriber backwards compatibility.
+          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scraper.py

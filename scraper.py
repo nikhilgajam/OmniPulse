@@ -37,8 +37,12 @@ log = logging.getLogger("omnipulse")
 # ─── Environment variables (set as GitHub Secrets) ──────────────────────────
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+
+# Support multiple subscribers: TELEGRAM_CHAT_IDS is a comma-separated list of chat IDs.
+# Falls back to TELEGRAM_CHAT_ID (single ID) for backwards compatibility.
+_raw_ids = os.getenv("TELEGRAM_CHAT_IDS", "") or os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_CHAT_IDS: list[str] = [cid.strip() for cid in _raw_ids.split(",") if cid.strip()]
 
 CONFIG_PATH = os.getenv("CONFIG_PATH", "config.json")
 
@@ -508,35 +512,38 @@ EXTRACTORS = {
 # ─── Notification helpers ──────────────────────────────────────────────────
 
 def send_telegram(message: str) -> bool:
-    """Send a message via Telegram Bot API."""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    """Send a message via Telegram Bot API to ALL subscribed chat IDs."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_IDS:
         log.warning("Telegram credentials not configured – skipping.")
         return False
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True,
-    }
-    try:
-        resp = requests.post(url, json=payload, timeout=30)
-        resp.raise_for_status()
-        log.info("Telegram message sent ✓")
-        return True
-    except requests.RequestException as exc:
-        log.warning("Telegram Markdown send failed: %s. Retrying as plain text...", exc)
+    all_ok = True
+
+    for chat_id in TELEGRAM_CHAT_IDS:
+        payload = {
+            "chat_id": chat_id,
+            "text": message,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True,
+        }
         try:
-            plain_payload = dict(payload)
-            plain_payload.pop("parse_mode", None)
-            resp = requests.post(url, json=plain_payload, timeout=30)
+            resp = requests.post(url, json=payload, timeout=30)
             resp.raise_for_status()
-            log.info("Telegram message sent (plain-text fallback) ✓")
-            return True
-        except requests.RequestException as retry_exc:
-            log.error("Telegram send failed completely: %s", retry_exc)
-            return False
+            log.info("Telegram message sent to %s ✓", chat_id)
+        except requests.RequestException as exc:
+            log.warning("Telegram Markdown send failed for %s: %s. Retrying as plain text...", chat_id, exc)
+            try:
+                plain_payload = dict(payload)
+                plain_payload.pop("parse_mode", None)
+                resp = requests.post(url, json=plain_payload, timeout=30)
+                resp.raise_for_status()
+                log.info("Telegram message sent to %s (plain-text fallback) ✓", chat_id)
+            except requests.RequestException as retry_exc:
+                log.error("Telegram send failed completely for %s: %s", chat_id, retry_exc)
+                all_ok = False
+
+    return all_ok
 
 
 NOTIFIERS = {
