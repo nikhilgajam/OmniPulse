@@ -183,16 +183,38 @@ def extract_reddit(response: requests.Response, fields: dict) -> dict:
         # Format 2: Atom/RSS XML
         try:
             root = ET.fromstring(resp.content)
-            entries = root.findall(".//{http://www.w3.org/2005/Atom}entry") or root.findall(".//entry")
+            entries = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+            if not entries:
+                entries = root.findall(".//entry")
+            if not entries:
+                entries = root.findall(".//item")
             if entries:
                 r = {}
                 for i, entry in enumerate(entries[:count], 1):
-                    title_el = entry.find("{http://www.w3.org/2005/Atom}title") or entry.find("title")
-                    cat_el = entry.find("{http://www.w3.org/2005/Atom}category") or entry.find("category")
-                    link_el = entry.find("{http://www.w3.org/2005/Atom}link") or entry.find("link")
-                    title = title_el.text.strip() if title_el is not None and title_el.text else "N/A"
-                    sub = cat_el.attrib.get("label", cat_el.attrib.get("term", "r/popular")) if cat_el is not None else "r/popular"
-                    link = link_el.attrib.get("href", "") if link_el is not None else ""
+                    title_el = entry.find("{http://www.w3.org/2005/Atom}title")
+                    if title_el is None:
+                        title_el = entry.find("title")
+
+                    cat_el = entry.find("{http://www.w3.org/2005/Atom}category")
+                    if cat_el is None:
+                        cat_el = entry.find("category")
+
+                    link_el = entry.find("{http://www.w3.org/2005/Atom}link")
+                    if link_el is None:
+                        link_el = entry.find("link")
+
+                    title = title_el.text.strip() if (title_el is not None and title_el.text) else "N/A"
+
+                    sub = "r/popular"
+                    if cat_el is not None:
+                        raw_sub = cat_el.attrib.get("label") or cat_el.attrib.get("term") or (cat_el.text.strip() if cat_el.text else "")
+                        if raw_sub:
+                            sub = raw_sub if raw_sub.startswith("r/") or raw_sub.startswith("/r/") else f"r/{raw_sub}"
+
+                    link = ""
+                    if link_el is not None:
+                        link = link_el.attrib.get("href") or (link_el.text.strip() if link_el.text else "")
+
                     r[f"post_{i}_title"] = title
                     r[f"post_{i}_subreddit"] = sub
                     r[f"post_{i}_score"] = ""
@@ -211,7 +233,7 @@ def extract_reddit(response: requests.Response, fields: dict) -> dict:
 
     # Primary failed (blocked/rate-limited/500) — try fallback URLs directly
     log.warning("Primary Reddit fetch failed or empty. Trying fallback endpoints...")
-    reddit_headers = {"User-Agent": "OmniPulse/1.0 (automated feed reader; github actions)"}
+    reddit_headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
     fallback_urls = [
         "https://www.reddit.com/r/popular/.rss",        # Atom feed — most reliable
         "https://www.reddit.com/r/popular.json?limit=5", # JSON API — may be rate-limited

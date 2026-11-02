@@ -23,11 +23,13 @@ on:
     #   - Weekdays only (Mon-Fri): use "1-5" (e.g., "45 3 * * 1-5")
     # ─────────────────────────────────────────────────────────────────────────
 
-    # 1) Morning Run: 09:15 AM IST (03:45 AM UTC) - Daily
-    - cron: "45 3 * * *"
+    # 1) Morning Run: ~09:15 AM IST (03:42 AM UTC) - Daily
+    # Using off-peak minute :42 to avoid heavy :00, :15, :30, :45 traffic jams
+    - cron: "42 3 * * *"
 
-    # 2) Afternoon Run: 03:35 PM IST (10:00 AM UTC) - Daily
-    - cron: "5 10 * * *"
+    # 2) Afternoon Run: ~03:45 PM IST (10:18 AM UTC) - Daily
+    # Using off-peak minute :18 to avoid the massive top-of-hour (:00 - :05) congestion
+    - cron: "18 10 * * *"
 
     # Runs every 6 hours: midnight, 6 AM, noon, 6 PM (UTC)
     # - cron: "0 */6 * * *"
@@ -38,6 +40,10 @@ on:
 
   # Allow manual trigger from GitHub Actions UI
   workflow_dispatch:
+
+  # Allow instant webhook triggers (e.g. via cron-job.org with zero queue delay)
+  repository_dispatch:
+    types: [run-omnipulse, omnipulse_trigger]
 
 jobs:
   monitor:
