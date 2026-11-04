@@ -1074,8 +1074,7 @@ def main() -> None:
     # Send closing divider to all notified channels
     divider_message = (
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🏁 *OmniPulse • Market Briefing Complete*\n"
-        "⏰ _Next pulse at market open / close (IST)_\n"
+        "🏁 *OmniPulse • Briefing Complete*\n"
         "━━━━━━━━━━━━━━━━━━━━━━━"
     )
 
