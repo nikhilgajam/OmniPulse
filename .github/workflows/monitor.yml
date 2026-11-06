@@ -23,15 +23,13 @@ on:
     #   - Weekdays only (Mon-Fri): use "1-5" (e.g., "45 3 * * 1-5")
     # ─────────────────────────────────────────────────────────────────────────
 
-    # 1) Morning Run: ~09:15 AM IST (03:42 AM UTC) - Daily
-    # Using off-peak minute :42 to avoid heavy :00, :15, :30, :45 traffic jams
-    # Due to CRON job delay adjusting to 12 instead of 3
-    - cron: "42 12 * * *"
+    # 1) Originally: Morning Run: ~09:15 AM IST (03:42 AM UTC) - Daily
+    # Due to CRON job delay adjusting
+    - cron: "42 9 * * *"
 
-    # 2) Afternoon Run: ~03:45 PM IST (10:18 AM UTC) - Daily
-    # Using off-peak minute :18 to avoid the massive top-of-hour (:00 - :05) congestion
-    # Due to CRON job delay adjusting to 1 instead of 10
-    - cron: "18 1 * * *"
+    # 2) Originally: Afternoon Run: ~03:45 PM IST (10:18 AM UTC) - Daily
+    # Due to CRON job delay adjusting
+    - cron: "42 2 * * *"
 
     # Runs every 6 hours: midnight, 6 AM, noon, 6 PM (UTC)
     # - cron: "0 */6 * * *"
